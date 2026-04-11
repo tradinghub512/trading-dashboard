@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Trading Performance Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  :root {
+    --bg: #0a0a0b;
+    --bg2: #111113;
+    --bg3: #18181c;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.12);
+    --text: #f0f0ee;
+    --muted: #6b6b72;
+    --muted2: #9191a0;
+    --green: #00e5a0;
+    --green-bg: rgba(0,229,160,0.08);
+    --red: #ff4d6d;
+    --red-bg: rgba(255,77,109,0.08);
+    --amber: #f5a623;
+    --blue: #4d9fff;
+    --accent: #00e5a0;
+    --font-mono: 'Space Mono', monospace;
+    --font-body: 'DM Sans', sans-serif;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: 14px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* HEADER */
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 20px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    background: rgba(10,10,11,0.92);
+    backdrop-filter: blur(12px);
+    z-index: 100;
+  }
+  .logo {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--accent);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    font-size: 12px;
+    color: var(--muted);
+    font-family: var(--font-mono);
+  }
+  .live-dot {
+    display: inline-block;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 8px var(--green);
+    animation: pulse 2s infinite;
+    margin-right: 6px;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  /* MAIN LAYOUT */
+  main { max-width: 1280px; margin: 0 auto; padding: 32px 32px 64px; }
+
+  /* HERO METRICS */
+  .hero-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 24px;
+  }
+  .hero-cell {
+    background: var(--bg2);
+    padding: 24px 28px;
+    position: relative;
+  }
+  .hero-cell:hover { background: var(--bg3); }
+  .hero-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+  .hero-val {
+    font-family: var(--font-mono);
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1;
+  }
+  .hero-sub {
+    font-size: 12px;
+    color: var(--muted2);
+    margin-top: 6px;
+  }
+  .hero-val.pos { color: var(--green); }
+  .hero-val.neg { color: var(--red); }
+  .hero-val.neu { color: var(--text); }
+
+  /* SECTION GRID */
+  .section-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+  }
+  .card-title {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 20px;
+  }
+  .full-width { grid-column: 1 / -1; }
+
+  /* STAT ROWS */
+  .stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .stat-row:last-child { border-bottom: none; }
+  .stat-key { color: var(--muted2); }
+  .stat-val { font-family: var(--font-mono); font-weight: 700; }
+
+  /* CHART WRAPPER */
+  .chart-wrap { position: relative; width: 100%; }
+
+  /* EQUITY CURVE */
+  #eq-wrap { height: 260px; }
+
+  /* MONTHLY TABLE */
+  .month-table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  thead tr { border-bottom: 1px solid var(--border2); }
+  th {
+    text-align: left;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 8px 12px;
+    white-space: nowrap;
+  }
+  td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+    white-space: nowrap;
+  }
+  tbody tr:hover { background: var(--bg3); }
+  tbody tr:last-child td { border-bottom: none; }
+  .td-mono { font-family: var(--font-mono); font-size: 12px; }
+
+  /* BADGES */
+  .badge {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    padding: 2px 10px;
+    border-radius: 20px;
+  }
+  .badge-pos { background: var(--green-bg); color: var(--green); border: 1px solid rgba(0,229,160,0.2); }
+  .badge-neg { background: var(--red-bg); color: var(--red); border: 1px solid rgba(255,77,109,0.2); }
+  .badge-neu { background: rgba(255,255,255,0.05); color: var(--muted2); border: 1px solid var(--border); }
+
+  /* SEASONALITY */
+  #season-wrap { height: 200px; }
+
+  /* TRADE LOG */
+  .filter-bar { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+  .filter-btn {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 6px 16px;
+    border-radius: 6px;
+    border: 1px solid var(--border2);
+    background: transparent;
+    color: var(--muted2);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .filter-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .filter-btn.active { background: var(--green-bg); border-color: var(--accent); color: var(--accent); }
+
+  /* STREAK BARS */
+  .streak-section { display: flex; gap: 24px; margin-top: 8px; }
+  .streak-item { flex: 1; }
+  .streak-label { font-size: 11px; color: var(--muted); margin-bottom: 8px; font-family: var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; }
+  .streak-num { font-family: var(--font-mono); font-size: 36px; font-weight: 700; line-height: 1; }
+
+  /* WIN/LOSS VISUAL BAR */
+  .wl-bar-wrap { margin: 16px 0 8px; }
+  .wl-bar {
+    height: 8px;
+    border-radius: 4px;
+    background: var(--bg3);
+    overflow: hidden;
+    display: flex;
+  }
+  .wl-bar-fill-w { background: var(--green); border-radius: 4px 0 0 4px; transition: width 1s ease; }
+  .wl-bar-fill-l { background: var(--red); }
+  .wl-bar-fill-b { background: var(--muted); border-radius: 0 4px 4px 0; }
+  .wl-legend { display: flex; gap: 16px; font-size: 12px; color: var(--muted2); margin-top: 8px; }
+  .wl-dot { width: 8px; height: 8px; border-radius: 2px; display: inline-block; margin-right: 5px; vertical-align: middle; }
+
+  /* ASSET BREAKDOWN */
+  .asset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; margin-top: 4px; }
+  .asset-card {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    text-align: center;
+  }
+  .asset-name { font-family: var(--font-mono); font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+  .asset-pnl { font-family: var(--font-mono); font-size: 12px; }
+  .asset-count { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  /* DISCLAIMER */
+  footer {
+    text-align: center;
+    color: var(--muted);
+    font-size: 11px;
+    padding: 24px 32px;
+    border-top: 1px solid var(--border);
+    font-family: var(--font-mono);
+    letter-spacing: 0.05em;
+  }
+
+  @media (max-width: 900px) {
+    .hero-grid { grid-template-columns: repeat(2, 1fr); }
+    .section-grid { grid-template-columns: 1fr; }
+    .full-width { grid-column: 1; }
+    main { padding: 20px 16px 48px; }
+    header { padding: 16px 20px; }
+  }
+  @media (max-width: 500px) {
+    .hero-grid { grid-template-columns: 1fr 1fr; }
+    .hero-val { font-size: 20px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">// TRADE_ANALYTICS</div>
+  <div class="header-right">
+    <span><span class="live-dot"></span>LIVE DASHBOARD</span>
+    <span id="header-date"></span>
+  </div>
+</header>
+
+<main>
+
+  <!-- HERO METRICS -->
+  <div class="hero-grid" id="heroGrid">
+    <div class="hero-cell">
+      <div class="hero-label">Net P&L</div>
+      <div class="hero-val" id="h-pnl">—</div>
+      <div class="hero-sub" id="h-ret">from $50,000 base</div>
+    </div>
+    <div class="hero-cell">
+      <div class="hero-label">Win rate</div>
+      <div class="hero-val" id="h-wr">—</div>
+      <div class="hero-sub" id="h-wrl">wins / losses / BE</div>
+    </div>
+    <div class="hero-cell">
+      <div class="hero-label">Expected value</div>
+      <div class="hero-val" id="h-ev">—</div>
+      <div class="hero-sub">per trade (excl. BE)</div>
+    </div>
+    <div class="hero-cell">
+      <div class="hero-label">Profit factor</div>
+      <div class="hero-val" id="h-pf">—</div>
+      <div class="hero-sub">gross wins / gross losses</div>
+    </div>
+  </div>
+
+  <!-- EQUITY CURVE -->
+  <div class="card" style="margin-bottom:24px;">
+    <div class="card-title">Equity curve — starting balance $50,000</div>
+    <div class="chart-wrap" id="eq-wrap">
+      <canvas id="eqChart" role="img" aria-label="Equity curve chart from $50,000 starting balance">Equity curve.</canvas>
+    </div>
+  </div>
+
+  <!-- TWO COLUMN -->
+  <div class="section-grid">
+
+    <!-- PERFORMANCE STATS -->
+    <div class="card">
+      <div class="card-title">Performance statistics</div>
+      <div class="stat-row"><span class="stat-key">Total trades</span><span class="stat-val neu" id="s-total">—</span></div>
+      <div class="stat-row"><span class="stat-key">Avg win</span><span class="stat-val pos" id="s-aw">—</span></div>
+      <div class="stat-row"><span class="stat-key">Avg loss</span><span class="stat-val neg" id="s-al">—</span></div>
+      <div class="stat-row"><span class="stat-key">Avg R:R ratio</span><span class="stat-val neu" id="s-rr">—</span></div>
+      <div class="stat-row"><span class="stat-key">Largest win</span><span class="stat-val pos" id="s-lw">—</span></div>
+      <div class="stat-row"><span class="stat-key">Largest loss</span><span class="stat-val neg" id="s-ll">—</span></div>
+      <div class="stat-row"><span class="stat-key">Best month</span><span class="stat-val pos" id="s-bm">—</span></div>
+      <div class="stat-row"><span class="stat-key">Worst month</span><span class="stat-val neg" id="s-wm">—</span></div>
+    </div>
+
+    <!-- WIN/LOSS + STREAKS -->
+    <div class="card">
+      <div class="card-title">Win / loss distribution</div>
+      <div class="wl-bar-wrap">
+        <div class="wl-bar" id="wlBar">
+          <div class="wl-bar-fill-w" id="wlW" style="width:0%"></div>
+          <div class="wl-bar-fill-l" id="wlL" style="width:0%"></div>
+          <div class="wl-bar-fill-b" id="wlB" style="width:0%"></div>
+        </div>
+        <div class="wl-legend">
+          <span><span class="wl-dot" style="background:var(--green)"></span>Wins <span id="wl-wn" style="color:var(--green);font-family:var(--font-mono)"></span></span>
+          <span><span class="wl-dot" style="background:var(--red)"></span>Losses <span id="wl-ln" style="color:var(--red);font-family:var(--font-mono)"></span></span>
+          <span><span class="wl-dot" style="background:var(--muted)"></span>BE <span id="wl-bn" style="color:var(--muted2);font-family:var(--font-mono)"></span></span>
+        </div>
+      </div>
+      <div style="height:1px;background:var(--border);margin:20px 0;"></div>
+      <div class="card-title">Streaks</div>
+      <div class="streak-section">
+        <div class="streak-item">
+          <div class="streak-label">Max win streak</div>
+          <div class="streak-num pos" id="s-mws">—</div>
+        </div>
+        <div class="streak-item">
+          <div class="streak-label">Max loss streak</div>
+          <div class="streak-num neg" id="s-mls">—</div>
+        </div>
+        <div class="streak-item">
+          <div class="streak-label">Current streak</div>
+          <div class="streak-num" id="s-cur">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ASSET BREAKDOWN -->
+    <div class="card">
+      <div class="card-title">Asset breakdown</div>
+      <div class="asset-grid" id="assetGrid"></div>
+    </div>
+
+    <!-- SEASONALITY -->
+    <div class="card">
+      <div class="card-title">Seasonality — avg monthly P&L</div>
+      <div class="chart-wrap" id="season-wrap">
+        <canvas id="seasonChart" role="img" aria-label="Average monthly P&L seasonality">Seasonality.</canvas>
+      </div>
+    </div>
+
+    <!-- MONTHLY TABLE -->
+    <div class="card full-width">
+      <div class="card-title">Monthly performance</div>
+      <div class="month-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Month</th><th>Trades</th><th>Wins</th><th>Losses</th><th>BE</th>
+              <th>Win rate</th><th>Net P&L ($)</th><th>P&L (%)</th><th>Cumulative</th>
+            </tr>
+          </thead>
+          <tbody id="monthTbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TRADE LOG -->
+    <div class="card full-width">
+      <div class="card-title">Trade log</div>
+      <div class="filter-bar">
+        <button class="filter-btn active" onclick="filterTrades('all',this)">All</button>
+        <button class="filter-btn" onclick="filterTrades('win',this)">Wins</button>
+        <button class="filter-btn" onclick="filterTrades('loss',this)">Losses</button>
+        <button class="filter-btn" onclick="filterTrades('be',this)">Break-even</button>
+      </div>
+      <div class="month-table-wrap">
+        <table>
+          <thead>
+            <tr><th>Asset</th><th>Direction</th><th>Date</th><th>P&L ($)</th><th>P&L (%)</th><th>Result</th></tr>
+          </thead>
+          <tbody id="tradeTbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<footer>
+  ANONYMOUS TRADING ANALYTICS DASHBOARD &nbsp;·&nbsp; DATA REFLECTS CLOSED POSITIONS ONLY &nbsp;·&nbsp; NOT FINANCIAL ADVICE
+</footer>
+
+<script>
+document.getElementById('header-date').textContent = new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}).toUpperCase();
+
+const raw = [
+  ["BTC","Short","Oct 2, 2025",-72.91,-0.73],["BTC","Long","Oct 2, 2025",1022.40,5.99],
+  ["LINK","Long","Oct 10, 2025",80.00,3.09],["DOT","Long","Oct 10, 2025",446.96,10.61],
+  ["SUI","Long","Oct 9, 2025",null,null],["SOL","Long","Oct 8, 2025",0.00,0.00],
+  ["ETH","Long","Oct 10, 2025",0.00,0.00],["LTC","Long","Oct 3, 2025",937.63,11.22],
+  ["BTC","Long","Oct 3, 2025",1162.19,9.94],["ETH","Short","Oct 2, 2025",-150.29,-2.53],
+  ["BTC","Short","Oct 7, 2025",-436.48,-2.00],["ETH","Short","Oct 7, 2025",-184.43,-0.84],
+  ["LTC","Short","Oct 10, 2025",84.88,1.21],["SOL","Short","Oct 10, 2025",0.00,0.00],
+  ["BTC","Short","Oct 11, 2025",1010.45,8.55],["SUI","Short","Oct 11, 2025",999.49,20.31],
+  ["ETH","Short","Oct 12, 2025",0.00,0.00],["SUI","Long","Oct 13, 2025",0.00,0.00],
+  ["SOL","Long","Oct 13, 2025",0.00,0.00],["ETH","Short","Oct 14, 2025",-246.59,-4.27],
+  ["SUI","Short","Oct 14, 2025",-250.10,-5.37],["ETH","Short","Oct 19, 2025",0.00,0.00],
+  ["SOL","Short","Oct 19, 2025",-271.61,-5.71],["BTC","Long","Oct 23, 2025",-248.78,-4.30],
+  ["ETH","Long","Oct 23, 2025",-249.16,-4.70],["SOL","Long","Oct 23, 2025",-248.50,-5.07],
+  ["SUI","Long","Oct 23, 2025",-245.86,-6.31],["BTC","Long","Oct 28, 2025",0.00,0.00],
+  ["ETH","Long","Oct 27, 2025",0.00,0.00],["SOL","Long","Oct 26, 2025",0.00,0.00],
+  ["SUI","Long","Oct 26, 2025",0.00,0.00],["SUI","Short","Nov 16, 2025",993.48,25.22],
+  ["BTC","Short","Nov 3, 2025",1000.16,4.00],["ETH","Short","Nov 4, 2025",998.13,18.18],
+  ["ETH","Short","Nov 12, 2025",-248.96,-2.65],["SOL","Short","Nov 14, 2025",997.90,14.53],
+  ["BTC","Short","Nov 18, 2025",996.22,11.34],["ETH","Short","Nov 13, 2025",-249.78,-3.64],
+  ["SOL","Short","Nov 19, 2025",0.00,0.00],["SUI","Short","Jan 6, 2026",0.00,0.00],
+  ["SOL","Long","Nov 28, 2025",0.00,0.00],["BTC","Long","Dec 1, 2025",0.00,0.00],
+  ["ETH","Long","Dec 1, 2025",-250.39,-3.48],["ETH","Short","Dec 2, 2025",-250.83,-5.88],
+  ["BTC","Short","Dec 2, 2025",-248.93,-4.65],["SUI","Short","Dec 2, 2025",-249.69,-8.79],
+  ["SUI","Long","Dec 3, 2025",-253.91,-13.98],["SUI","Long","Dec 4, 2025",-248.48,-6.74],
+  ["BTC","Long","Dec 7, 2025",-250.31,-2.06],["ETH","Long","Dec 7, 2025",-249.75,-3.54],
+  ["SOL","Long","Dec 7, 2025",-249.91,-2.75],["SUI","Short","Jan 5, 2026",0.00,0.00],
+  ["ETH","Short","Dec 15, 2025",-249.66,-4.85],["BTC","Short","Dec 17, 2025",-249.85,-3.02],
+  ["SOL","Short","Dec 17, 2025",-249.70,-4.29],["BTC","Short","Dec 18, 2025",-248.41,-4.74],
+  ["ETH","Short","Dec 18, 2025",-253.40,-6.51],["BTC","Long","Dec 26, 2025",-251.96,-1.72],
+  ["ETH","Long","Dec 26, 2025",-250.10,-2.06],["BTC","Long","Dec 29, 2025",-255.96,-2.37],
+  ["ETH","Long","Dec 29, 2025",-248.90,-3.12],["SUI","Short","Jan 1, 2026",-254.50,-2.83],
+  ["SUI","Long","Jan 5, 2026",1000.29,13.76],["BTC","Long","Jan 6, 2026",0.00,0.00],
+  ["BTC","Short","Jan 6, 2026",-249.28,-1.65],["SOL","Short","Jan 6, 2026",-249.99,-3.01],
+  ["BTC","Short","Jan 12, 2026",-250.75,-0.87],["BTC","Long","Jan 13, 2026",998.75,4.64],
+  ["SUI","Short","Jan 17, 2026",-245.76,-3.37],["BTC","Short","Feb 3, 2026",994.59,13.62],
+  ["ETH","Short","Jan 31, 2026",999.07,14.93],["SOL","Short","Jan 30, 2026",0.00,0.00],
+  ["BTC","Short","Feb 16, 2026",0.00,0.00],["BTC","Short","Feb 19, 2026",-249.28,-2.23],
+  ["ETH","Short","Feb 23, 2026",993.48,5.50],["SOL","Short","Feb 24, 2026",1001.10,8.45],
+  ["BTC","Short","Feb 25, 2026",-249.78,-4.18],["SOL","Short","Feb 25, 2026",-249.97,-6.66],
+  ["SUI","Short","Feb 25, 2026",-249.48,-5.53],["BTC","Long","Feb 1, 2026",0.00,0.00],
+  ["SOL","Long","Feb 26, 2026",0.00,0.00],["SUI","Long","Feb 26, 2026",-246.15,-5.15],
+  ["BTC","Short","Feb 28, 2026",-248.22,-3.09],["SOL","Short","Feb 28, 2026",-257.53,-4.04],
+  ["SUI","Short","Feb 28, 2026",-242.40,-4.76],["BTC","Long","Mar 3, 2026",-250.11,-4.02],
+  ["SOL","Long","Mar 3, 2026",-249.90,-5.52],["ETH","Long","Mar 3, 2026",-250.00,-4.89],
+  ["SUI","Long","Mar 5, 2026",-249.04,-4.50],["BTC","Short","Mar 30, 2026",-251.14,-2.95]
+];
+
+const trades = raw.map((r,i) => ({
+  idx:i, asset:r[0], dir:r[1], date:r[2], pnl:r[3], pct:r[4],
+  result: r[3]===null?'ref': r[3]>0?'win': r[3]<0?'loss':'be'
+})).filter(t => t.result !== 'ref');
+
+const wins = trades.filter(t=>t.result==='win');
+const losses = trades.filter(t=>t.result==='loss');
+const bes = trades.filter(t=>t.result==='be');
+
+const totalPnl = trades.reduce((a,t)=>a+t.pnl,0);
+const grossW = wins.reduce((a,t)=>a+t.pnl,0);
+const grossL = Math.abs(losses.reduce((a,t)=>a+t.pnl,0));
+const pf = grossW/grossL;
+const avgWin = grossW/wins.length;
+const avgLoss = losses.reduce((a,t)=>a+t.pnl,0)/losses.length;
+// EV excluding BE trades
+const activeTrades = wins.length + losses.length;
+const wrActive = wins.length/activeTrades;
+const ev = (wrActive*avgWin)+((1-wrActive)*avgLoss);
+const wr = wins.length/trades.length;
+const avgRR = (avgWin/Math.abs(avgLoss));
+
+// Streaks
+let maxW=0,maxL=0,curW=0,curL=0,curStreak=0,curType='';
+trades.forEach(t=>{
+  if(t.result==='win'){curW++;curL=0;maxW=Math.max(maxW,curW);curStreak=curW;curType='win';}
+  else if(t.result==='loss'){curL++;curW=0;maxL=Math.max(maxL,curL);curStreak=curL;curType='loss';}
+  else{curW=0;curL=0;curStreak=0;curType='be';}
+});
+
+const $=id=>document.getElementById(id);
+const fmtD = v=>(v>=0?'+':'')+v.toFixed(0);
+const fmtM = v=>'$'+Math.abs(v).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0});
+
+$('h-pnl').textContent=(totalPnl>=0?'+':'')+fmtM(totalPnl);
+$('h-pnl').className='hero-val '+(totalPnl>=0?'pos':'neg');
+$('h-ret').textContent='Total return: '+((totalPnl/50000)*100).toFixed(2)+'%  |  from $50,000 base';
+$('h-wr').textContent=(wr*100).toFixed(1)+'%';
+$('h-wr').className='hero-val '+(wr>=0.5?'pos':'neg');
+$('h-wrl').textContent=wins.length+' W  /  '+losses.length+' L  /  '+bes.length+' BE';
+$('h-ev').textContent=(ev>=0?'+':'')+fmtM(ev);
+$('h-ev').className='hero-val '+(ev>=0?'pos':'neg');
+$('h-pf').textContent=pf.toFixed(2)+'×';
+$('h-pf').className='hero-val '+(pf>=1?'pos':'neg');
+$('s-total').textContent=trades.length;
+$('s-aw').textContent='+'+fmtM(avgWin);
+$('s-al').textContent='-'+fmtM(Math.abs(avgLoss));
+$('s-rr').textContent='1:'+avgRR.toFixed(2);
+$('s-lw').textContent='+'+fmtM(Math.max(...wins.map(t=>t.pnl)));
+$('s-ll').textContent='-'+fmtM(Math.abs(Math.min(...losses.map(t=>t.pnl))));
+$('s-mws').textContent=maxW;
+$('s-mls').textContent=maxL;
+$('s-cur').textContent=(curStreak>0?(curType==='win'?'+':'-')+curStreak:'0');
+$('s-cur').className='streak-num '+(curType==='win'?'pos':curType==='loss'?'neg':'');
+
+// WL bar
+const wPct=(wins.length/trades.length*100).toFixed(1);
+const lPct=(losses.length/trades.length*100).toFixed(1);
+const bPct=(bes.length/trades.length*100).toFixed(1);
+$('wlW').style.width=wPct+'%';
+$('wlL').style.width=lPct+'%';
+$('wlB').style.width=bPct+'%';
+$('wl-wn').textContent=wins.length+' ('+wPct+'%)';
+$('wl-ln').textContent=losses.length+' ('+lPct+'%)';
+$('wl-bn').textContent=bes.length+' ('+bPct+'%)';
+
+// Month map
+const monthMap={};
+trades.forEach(t=>{
+  const d=new Date(t.date); if(isNaN(d)) return;
+  const key=d.toLocaleString('en-US',{month:'short',year:'numeric'});
+  if(!monthMap[key]) monthMap[key]={pnl:0,wins:0,losses:0,bes:0,total:0,year:d.getFullYear(),month:d.getMonth()};
+  monthMap[key].pnl+=t.pnl; monthMap[key].total++;
+  if(t.result==='win') monthMap[key].wins++;
+  else if(t.result==='loss') monthMap[key].losses++;
+  else monthMap[key].bes++;
+});
+const months=Object.entries(monthMap).sort((a,b)=>{
+  if(a[1].year!==b[1].year) return a[1].year-b[1].year;
+  return a[1].month-b[1].month;
+});
+const bestM=months.reduce((a,b)=>b[1].pnl>a[1].pnl?b:a);
+const worstM=months.reduce((a,b)=>b[1].pnl<a[1].pnl?b:a);
+$('s-bm').textContent=bestM[0]+' (+$'+Math.abs(bestM[1].pnl).toFixed(0)+')';
+$('s-wm').textContent=worstM[0]+' (-$'+Math.abs(worstM[1].pnl).toFixed(0)+')';
+
+// Monthly table
+let cumBal=50000;
+let mHtml='';
+months.forEach(([k,v])=>{
+  const prev=cumBal;
+  cumBal+=v.pnl;
+  const mwr=v.total>0?(v.wins/v.total*100).toFixed(0)+'%':'—';
+  const pct=((v.pnl/prev)*100);
+  const cls=v.pnl>0?'pos':v.pnl<0?'neg':'';
+  const bCls=v.pnl>0?'badge-pos':v.pnl<0?'badge-neg':'badge-neu';
+  mHtml+=`<tr>
+    <td class="td-mono">${k}</td>
+    <td>${v.total}</td><td style="color:var(--green)">${v.wins}</td>
+    <td style="color:var(--red)">${v.losses}</td>
+    <td style="color:var(--muted2)">${v.bes}</td>
+    <td class="td-mono">${mwr}</td>
+    <td class="td-mono ${cls}">${v.pnl>=0?'+':''}\$${Math.abs(v.pnl).toFixed(0)}</td>
+    <td><span class="badge ${bCls}">${pct>=0?'+':''}${pct.toFixed(2)}%</span></td>
+    <td class="td-mono">\$${Math.round(cumBal).toLocaleString()}</td>
+  </tr>`;
+});
+$('monthTbody').innerHTML=mHtml;
+
+// Equity curve
+let bal=50000;
+const eqLabels=['Start'];
+const eqData=[50000];
+trades.forEach((t,i)=>{
+  bal+=t.pnl;
+  eqLabels.push('#'+(i+1));
+  eqData.push(Math.round(bal));
+});
+
+new Chart($('eqChart'),{
+  type:'line',
+  data:{
+    labels:eqLabels,
+    datasets:[{
+      label:'Balance',data:eqData,
+      borderColor:'#00e5a0',
+      backgroundColor:'rgba(0,229,160,0.05)',
+      borderWidth:1.5,pointRadius:0,fill:true,tension:0.3
+    }]
+  },
+  options:{
+    responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:false},tooltip:{
+      callbacks:{label:ctx=>'$'+Math.round(ctx.raw).toLocaleString()}
+    }},
+    scales:{
+      x:{display:false},
+      y:{
+        ticks:{callback:v=>'$'+(v/1000).toFixed(0)+'k',font:{size:11},color:'#6b6b72'},
+        grid:{color:'rgba(255,255,255,0.05)'},
+        border:{color:'transparent'}
+      }
+    }
+  }
+});
+
+// Seasonality
+const seasonData={};
+months.forEach(([k,v])=>{
+  const mn=k.split(' ')[0];
+  if(!seasonData[mn]) seasonData[mn]={total:0,count:0};
+  seasonData[mn].total+=v.pnl; seasonData[mn].count++;
+});
+const allM=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const sLabels=[],sVals=[];
+allM.forEach(m=>{
+  if(seasonData[m]){
+    sLabels.push(m);
+    sVals.push(Math.round(seasonData[m].total/seasonData[m].count));
+  }
+});
+new Chart($('seasonChart'),{
+  type:'bar',
+  data:{
+    labels:sLabels,
+    datasets:[{
+      data:sVals,
+      backgroundColor:sVals.map(v=>v>=0?'rgba(0,229,160,0.7)':'rgba(255,77,109,0.7)'),
+      borderRadius:4
+    }]
+  },
+  options:{
+    responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:false}},
+    scales:{
+      x:{ticks:{font:{size:12},color:'#6b6b72'},grid:{display:false},border:{color:'transparent'}},
+      y:{ticks:{callback:v=>(v>=0?'+$':'-$')+Math.abs(v),font:{size:11},color:'#6b6b72'},
+         grid:{color:'rgba(255,255,255,0.05)'},border:{color:'transparent'}}
+    }
+  }
+});
+
+// Asset breakdown
+const assetMap={};
+trades.forEach(t=>{
+  if(!assetMap[t.asset]) assetMap[t.asset]={pnl:0,count:0};
+  assetMap[t.asset].pnl+=t.pnl; assetMap[t.asset].count++;
+});
+const ag=$('assetGrid');
+Object.entries(assetMap).sort((a,b)=>b[1].pnl-a[1].pnl).forEach(([name,v])=>{
+  const cls=v.pnl>0?'pos':v.pnl<0?'neg':'';
+  const color=v.pnl>0?'var(--green)':v.pnl<0?'var(--red)':'var(--muted2)';
+  ag.innerHTML+=`<div class="asset-card">
+    <div class="asset-name">${name}</div>
+    <div class="asset-pnl" style="color:${color}">${v.pnl>=0?'+':''}\$${Math.abs(v.pnl).toFixed(0)}</div>
+    <div class="asset-count">${v.count} trades</div>
+  </div>`;
+});
+
+// Trade log
+let currentFilter='all';
+function filterTrades(f,btn){
+  currentFilter=f;
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderTrades();
+}
+function renderTrades(){
+  const filtered=currentFilter==='all'?trades:
+    currentFilter==='win'?trades.filter(t=>t.result==='win'):
+    currentFilter==='loss'?trades.filter(t=>t.result==='loss'):
+    trades.filter(t=>t.result==='be');
+  let html='';
+  filtered.forEach(t=>{
+    const cls=t.result==='win'?'pos':t.result==='loss'?'neg':'';
+    const bCls=t.result==='win'?'badge-pos':t.result==='loss'?'badge-neg':'badge-neu';
+    const label=t.result==='win'?'WIN':t.result==='loss'?'LOSS':'BE';
+    html+=`<tr>
+      <td class="td-mono" style="font-weight:700">${t.asset}</td>
+      <td>${t.dir}</td>
+      <td class="td-mono" style="color:var(--muted2)">${t.date}</td>
+      <td class="td-mono ${cls}">${t.pnl>=0?'+':''}\$${Math.abs(t.pnl).toFixed(0)}</td>
+      <td class="td-mono ${cls}">${t.pct!=null?(t.pct>=0?'+':'')+t.pct.toFixed(2)+'%':'—'}</td>
+      <td><span class="badge ${bCls}">${label}</span></td>
+    </tr>`;
+  });
+  $('tradeTbody').innerHTML=html;
+}
+renderTrades();
+</script>
+</body>
+</html>
